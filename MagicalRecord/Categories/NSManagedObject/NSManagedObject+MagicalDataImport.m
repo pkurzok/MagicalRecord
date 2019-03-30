@@ -313,12 +313,30 @@ NSString * const kMagicalRecordImportAttributeUseDefaultValueWhenNotPresent = @"
             id value = [objectData MR_valueForAttribute:primaryAttribute];
             managedObject = [self MR_findFirstByAttribute:[primaryAttribute name] withValue:value inContext:context];
         }
+        
+        // The object must be created
+        // Otherwise should import cannot be called
         if (managedObject == nil)
         {
             managedObject = [self MR_createEntityInContext:context];
         }
-
-        [managedObject MR_importValuesForKeysWithObject:objectData];
+        
+        if ([managedObject respondsToSelector:@selector(shouldImport:)])
+        {
+            BOOL shouldImport = (BOOL)[managedObject performSelector:@selector(shouldImport:) withObject:objectData];
+            
+            // If should import returns NO, the just created object has to be destroyed.
+            if (!shouldImport)
+            {
+                [managedObject MR_deleteEntityInContext:context];
+                managedObject = nil;
+            }
+        }
+        
+        if (managedObject != nil )
+        {
+            [managedObject MR_importValuesForKeysWithObject:objectData];
+        }
     }];
 
     return managedObject;
@@ -350,7 +368,10 @@ NSString * const kMagicalRecordImportAttributeUseDefaultValueWhenNotPresent = @"
 
         NSManagedObject *dataObject = [self MR_importFromObject:objectData inContext:context];
 
-        [dataObjects addObject:dataObject];
+        if ( dataObject != nil )
+        {
+            [dataObjects addObject:dataObject];
+        }
     }];
 
     return dataObjects;
